@@ -12,6 +12,7 @@ export interface Message {
   lineIndex: number;
   labelStart: number;
   labelEnd: number;
+  lastLineIndex: number;
 }
 
 export interface DiagramData {
@@ -20,25 +21,61 @@ export interface DiagramData {
 }
 
 const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
-  { regex: /^(.+?)\s*-->\s*(.+?)\s*:\s*(.+)$/, type: 'async' },
-  { regex: /^(.+?)\s*->>\s*(.+?)\s*:\s*(.+)$/, type: 'async' },
-  { regex: /^(.+?)\s*<--\s*(.+?)\s*:\s*(.+)$/, type: 'reply' },
-  { regex: /^(.+?)\s*<<--\s*(.+?)\s*:\s*(.+)$/, type: 'reply' },
-  { regex: /^(.+?)\s*->\s*(.+?)\s*:\s*(.+)$/, type: 'sync' },
-  { regex: /^(\w+)\s*:\s*(.+)$/, type: 'self' },
+  { regex: /^([\s\S]+?)\s*-->\s*([\s\S]+?)\s*:\s*([\s\S]+)$/, type: 'async' },
+  { regex: /^([\s\S]+?)\s*->>\s*([\s\S]+?)\s*:\s*([\s\S]+)$/, type: 'async' },
+  { regex: /^([\s\S]+?)\s*<--\s*([\s\S]+?)\s*:\s*([\s\S]+)$/, type: 'reply' },
+  { regex: /^([\s\S]+?)\s*<<--\s*([\s\S]+?)\s*:\s*([\s\S]+)$/, type: 'reply' },
+  { regex: /^([\s\S]+?)\s*->\s*([\s\S]+?)\s*:\s*([\s\S]+)$/, type: 'sync' },
+  { regex: /^(\w+)\s*:\s*([\s\S]+)$/, type: 'self' },
 ];
+
+function mergeQuotedLines(lines: string[]): { text: string; originalIndex: number; lastOriginalIndex: number }[] {
+  const result: { text: string; originalIndex: number; lastOriginalIndex: number }[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed.includes('"')) {
+      result.push({ text: line, originalIndex: i, lastOriginalIndex: i });
+      continue;
+    }
+
+    const quoteCount = (trimmed.match(/"/g) || []).length;
+    if (quoteCount % 2 === 0) {
+      result.push({ text: line, originalIndex: i, lastOriginalIndex: i });
+      continue;
+    }
+
+    let merged = line;
+    let lastIdx = i;
+    for (let j = i + 1; j < lines.length; j++) {
+      merged += '\n' + lines[j];
+      lastIdx = j;
+      const closeCount = (lines[j].match(/"/g) || []).length;
+      if (closeCount > 0) {
+        break;
+      }
+    }
+    result.push({ text: merged, originalIndex: i, lastOriginalIndex: lastIdx });
+    i = lastIdx;
+  }
+
+  return result;
+}
 
 export function parseDiagram(input: string): DiagramData {
   const participants: Participant[] = [];
   const messages: Message[] = [];
   const participantSet = new Set<string>();
-  const lines = input.split('\n');
+  const rawLines = input.split('\n');
+  const mergedLines = mergeQuotedLines(rawLines);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line || line.startsWith('#')) continue;
+  for (const { text: line, originalIndex: i, lastOriginalIndex } of mergedLines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
 
-    const participantMatch = line.match(/^participant\s+"?([^"\s]+)"?(?:\s+as\s+(\w+))?$/i);
+    const participantMatch = trimmed.match(/^participant\s+"?([^"\s]+)"?(?:\s+as\s+(\w+))?$/i);
     if (participantMatch) {
       const name = participantMatch[1];
       const alias = participantMatch[2];
@@ -50,7 +87,7 @@ export function parseDiagram(input: string): DiagramData {
     }
 
     for (const { regex, type } of ARROW_PATTERNS) {
-      const match = line.match(regex);
+      const match = trimmed.match(regex);
       if (match) {
         let from: string, to: string, label: string;
 
@@ -64,6 +101,10 @@ export function parseDiagram(input: string): DiagramData {
           label = match[3].trim();
         }
 
+        if (label.startsWith('"') && label.endsWith('"')) {
+          label = label.slice(1, -1);
+        }
+
         if (!participantSet.has(from)) {
           participantSet.add(from);
           participants.push({ name: from, lineIndex: i });
@@ -74,10 +115,12 @@ export function parseDiagram(input: string): DiagramData {
         }
 
         const colonIdx = line.indexOf(':');
+        const labelStart = colonIdx + 1;
+        const labelEnd = labelStart + label.length;
+
         messages.push({
           from, to, label, type, lineIndex: i,
-          labelStart: colonIdx + 1,
-          labelEnd: line.length,
+          labelStart, labelEnd, lastLineIndex: lastOriginalIndex,
         });
         break;
       }

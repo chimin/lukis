@@ -9,16 +9,30 @@ const DEFAULT_TEXT = `# Sequence Diagram Editor
 #   A --> B: message      (async call)
 #   A <-- B: message      (return)
 #   A: message              (self-message)
+#   A -> B: "multiline
+#     description"
 
 participant Client
 participant Server
 participant Database
+participant Cache
 
-Client -> Server: send API request
-Server: validate input
-Server -> Database: query data
-Database --> Server: return results
-Server --> Client: send response`;
+Client -> Server: "POST /api/users
+  Content-Type: application/json
+  { name, email }"
+Server: "validate input
+  and check permissions"
+Server -> Cache: check cache
+Cache --> Server: cache miss
+Server -> Database: "SELECT * FROM users
+  WHERE email = ?
+  LIMIT 1"
+Database --> Server: return row
+Server -> Cache: "SET user:123
+  EX 3600"
+Cache --> Server: OK
+Server --> Client: "201 Created
+  { id: 123, name, email }"`;
 
 function selectAndScroll(
   textarea: HTMLTextAreaElement,
@@ -37,6 +51,38 @@ function selectAndScroll(
   const lineHeight = 22;
   const scrollTarget = lineIdx * lineHeight - textarea.clientHeight / 2 + lineHeight;
   textarea.scrollTop = Math.max(0, scrollTarget);
+}
+
+function findQuotedBlock(fullText: string, startLineIdx: number, labelText: string) {
+  const lines = fullText.split('\n');
+  const startLine = lines[startLineIdx];
+  const quoteStart = startLine.indexOf('"');
+  if (quoteStart === -1) return null;
+
+  let lastLineIdx = startLineIdx;
+  let collected = '';
+  for (let i = startLineIdx; i < lines.length; i++) {
+    const line = lines[i];
+    const from = i === startLineIdx ? quoteStart + 1 : 0;
+    const slice = line.slice(from);
+    collected += (i > startLineIdx ? '\n' : '') + slice;
+    if (i > startLineIdx && line.includes('"')) {
+      const closeIdx = line.indexOf('"');
+      collected = collected.slice(0, collected.length - (slice.length - closeIdx));
+      lastLineIdx = i;
+      break;
+    }
+    lastLineIdx = i;
+  }
+
+  if (collected.trim() === labelText) {
+    const lineStart = lines.slice(0, startLineIdx).reduce((sum, l) => sum + l.length + 1, 0);
+    const absStart = lineStart + quoteStart;
+    const lastLineStart = lines.slice(0, lastLineIdx).reduce((sum, l) => sum + l.length + 1, 0);
+    const lastLineEnd = lastLineStart + lines[lastLineIdx].length;
+    return { startLine: startLineIdx, startChar: absStart, endChar: lastLineEnd };
+  }
+  return null;
 }
 
 function App() {
@@ -80,11 +126,19 @@ function App() {
         ]) {
           const match = trimmed.match(regex);
           if (match) {
-            const label = match[3] ? match[3].trim() : match[2].trim();
+            const rawLabel = match[3] ? match[3] : match[2];
+            const label = rawLabel.trim();
             if (label === text) {
               const labelStart = line.indexOf(label, line.indexOf(':'));
               selectAndScroll(textarea, lines, i, labelStart, labelStart + label.length);
               return;
+            }
+            if (rawLabel.trim().startsWith('"')) {
+              const block = findQuotedBlock(textarea.value, i, text);
+              if (block) {
+                selectAndScroll(textarea, lines, block.startLine, block.startChar, block.endChar);
+                return;
+              }
             }
             break;
           }

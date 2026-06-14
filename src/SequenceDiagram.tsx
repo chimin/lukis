@@ -2,15 +2,13 @@ import type { DiagramData } from './parser';
 
 interface SequenceDiagramProps {
   data: DiagramData;
-  onSelect: (type: 'participant' | 'message' | 'note', text: string) => void;
+  onSelect: (type: 'participant' | 'message', text: string) => void;
 }
 
 const PARTICIPANT_WIDTH = 140;
 const PARTICIPANT_HEIGHT = 40;
 const PARTICIPANT_GAP = 60;
 const MESSAGE_GAP = 50;
-const NOTE_HEIGHT = 36;
-const NOTE_WIDTH = 120;
 const PADDING_TOP = 30;
 const PADDING_BOTTOM = 60;
 const SELF_MESSAGE_WIDTH = 40;
@@ -20,7 +18,7 @@ function getTextWidth(text: string): number {
 }
 
 export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
-  const { participants, messages, notes } = data;
+  const { participants, messages } = data;
 
   if (participants.length === 0) {
     return (
@@ -31,7 +29,7 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
   }
 
   const diagramWidth = participants.length * PARTICIPANT_WIDTH + (participants.length - 1) * PARTICIPANT_GAP + 80;
-  const contentHeight = messages.length * MESSAGE_GAP + notes.length * (NOTE_HEIGHT + 10);
+  const contentHeight = messages.length * MESSAGE_GAP;
   const diagramHeight = PADDING_TOP + PARTICIPANT_HEIGHT + Math.max(contentHeight, 100) + PADDING_BOTTOM;
 
   const getParticipantX = (name: string): number => {
@@ -57,9 +55,6 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
     >
       <defs>
         <marker id="arrow-sync" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
-        </marker>
-        <marker id="arrow-async" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
         </marker>
         <marker id="arrow-reply-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -197,52 +192,6 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
               fontSize={12}
             >
               {msg.label}
-            </text>
-          </g>
-        );
-      })}
-
-      {notes.map((note, i) => {
-        const participantX = getParticipantBoxX(note.participant);
-        const msgY = lineY + 30 + (messages.length > 0 ? (i * Math.max(1, Math.floor(messages.length / Math.max(notes.length, 1))) * MESSAGE_GAP) : i * (NOTE_HEIGHT + 10));
-
-        let noteX: number;
-        if (note.position === 'left') {
-          noteX = participantX - NOTE_WIDTH - 10;
-        } else if (note.position === 'right') {
-          noteX = participantX + PARTICIPANT_WIDTH + 10;
-        } else {
-          noteX = participantX + (PARTICIPANT_WIDTH - NOTE_WIDTH) / 2;
-        }
-
-        return (
-          <g key={`note-${i}`} onClick={() => onSelect('note', note.text)} style={{ cursor: 'pointer' }}>
-            <rect
-              x={noteX - 4}
-              y={msgY - 4}
-              width={NOTE_WIDTH + 8}
-              height={NOTE_HEIGHT + 8}
-              rx={4}
-              fill="transparent"
-            />
-            <rect
-              x={noteX}
-              y={msgY}
-              width={NOTE_WIDTH}
-              height={NOTE_HEIGHT}
-              rx={4}
-              fill="#fff9c4"
-              stroke="#f0c040"
-              strokeWidth={1}
-            />
-            <text
-              x={noteX + NOTE_WIDTH / 2}
-              y={msgY + NOTE_HEIGHT / 2 + 4}
-              textAnchor="middle"
-              fill="#666"
-              fontSize={11}
-            >
-              {note.text}
             </text>
           </g>
         );

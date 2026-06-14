@@ -14,19 +14,9 @@ export interface Message {
   labelEnd: number;
 }
 
-export interface Note {
-  position: 'left' | 'right' | 'over';
-  participant: string;
-  text: string;
-  lineIndex: number;
-  textStart: number;
-  textEnd: number;
-}
-
 export interface DiagramData {
   participants: Participant[];
   messages: Message[];
-  notes: Note[];
 }
 
 const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
@@ -41,7 +31,6 @@ const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
 export function parseDiagram(input: string): DiagramData {
   const participants: Participant[] = [];
   const messages: Message[] = [];
-  const notes: Note[] = [];
   const participantSet = new Set<string>();
   const lines = input.split('\n');
 
@@ -57,20 +46,6 @@ export function parseDiagram(input: string): DiagramData {
         participantSet.add(name);
         participants.push({ name, alias, lineIndex: i });
       }
-      continue;
-    }
-
-    const noteMatch = line.match(/^note\s+(left|right|over)\s+(?:of\s+)?(\w+)\s*:\s*(.+)$/i);
-    if (noteMatch) {
-      const colonIdx = line.indexOf(':');
-      notes.push({
-        position: noteMatch[1] as 'left' | 'right' | 'over',
-        participant: noteMatch[2],
-        text: noteMatch[3],
-        lineIndex: i,
-        textStart: colonIdx + 1,
-        textEnd: line.length,
-      });
       continue;
     }
 
@@ -109,5 +84,5 @@ export function parseDiagram(input: string): DiagramData {
     }
   }
 
-  return { participants, messages, notes };
+  return { participants, messages };
 }

@@ -9,9 +9,6 @@ const DEFAULT_TEXT = `# Sequence Diagram Editor
 #   A --> B: message      (async call)
 #   A <-- B: message      (return)
 #   A: message              (self-message)
-#   note left of A: text
-#   note right of B: text
-#   note over A: text
 
 participant Client
 participant Server
@@ -21,8 +18,7 @@ Client -> Server: send API request
 Server: validate input
 Server -> Database: query data
 Database --> Server: return results
-Server --> Client: send response
-note right of Server: Processes the request`;
+Server --> Client: send response`;
 
 function selectAndScroll(
   textarea: HTMLTextAreaElement,
@@ -49,7 +45,7 @@ function App() {
 
   const diagramData = useMemo(() => parseDiagram(text), [text]);
 
-  const handleSelect = useCallback((type: 'participant' | 'message' | 'note', text: string) => {
+  const handleSelect = useCallback((type: 'participant' | 'message', text: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -91,19 +87,6 @@ function App() {
               return;
             }
             break;
-          }
-        }
-        continue;
-      }
-
-      if (type === 'note') {
-        const noteMatch = trimmed.match(/^note\s+(left|right|over)\s+(?:of\s+)?(\w+)\s*:\s*(.+)$/i);
-        if (noteMatch) {
-          const noteText = noteMatch[3].trim();
-          if (noteText === text) {
-            const textStart = line.indexOf(noteText, line.indexOf(':'));
-            selectAndScroll(textarea, lines, i, textStart, textStart + noteText.length);
-            return;
           }
         }
         continue;

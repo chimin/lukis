@@ -113,7 +113,7 @@ function App() {
 
   const diagramData = useMemo(() => parseDiagram(text), [text]);
 
-  const handleSelect = useCallback((type: 'participant' | 'message' | 'divider', text: string) => {
+  const handleSelect = useCallback((type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -138,6 +138,35 @@ function App() {
       }
 
       if (type === 'message') {
+        if (text.includes('\n') && lineIndex !== undefined) {
+          const line = lines[lineIndex];
+          const colonIdx = line.indexOf(':');
+          const quoteStart = line.indexOf('"', colonIdx);
+          if (quoteStart !== -1) {
+            const labelText = text;
+            const labelStartInLine = line.indexOf(labelText.split('\n')[0], quoteStart + 1);
+            if (labelStartInLine !== -1) {
+              selectAndScroll(textarea, lines, lineIndex, labelStartInLine, labelStartInLine + labelText.length);
+              return;
+            }
+          }
+          selectAndScroll(textarea, lines, lineIndex, 0, line.length);
+          return;
+        }
+
+        if (text.includes('\n')) {
+          for (let j = 0; j < lines.length; j++) {
+            if (!lines[j].includes('"')) continue;
+            const block = findQuotedBlock(textarea.value, j, text);
+            if (block) {
+              selectAndScroll(textarea, lines, block.startLine, block.startChar, block.endChar);
+              return;
+            }
+          }
+          console.warn('No multiline block found for:', JSON.stringify(text));
+          return;
+        }
+
         const noteMatch = trimmed.match(/^note\s+(?:left|right|over)\s+(?:of\s+)?\w+\s*:\s*(.+)$/i);
         if (noteMatch && noteMatch[1].trim() === text) {
           const labelStart = lines[i].indexOf(noteMatch[1].trim(), lines[i].indexOf(':'));
@@ -150,6 +179,17 @@ function App() {
           const labelStart = lines[i].indexOf(titleMatch[1].trim());
           selectAndScroll(textarea, lines, i, labelStart, labelStart + titleMatch[1].trim().length);
           return;
+        }
+
+        if (text.includes('\n')) {
+          for (let j = 0; j < lines.length; j++) {
+            const block = findQuotedBlock(textarea.value, j, text);
+            if (block) {
+              selectAndScroll(textarea, lines, block.startLine, block.startChar, block.endChar);
+              return;
+            }
+          }
+          continue;
         }
 
         for (const regex of [

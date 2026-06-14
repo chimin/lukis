@@ -2,7 +2,7 @@ import type { DiagramData } from './parser';
 
 interface SequenceDiagramProps {
   data: DiagramData;
-  onSelect: (type: 'participant' | 'message' | 'divider', text: string) => void;
+  onSelect: (type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => void;
 }
 
 const PARTICIPANT_WIDTH = 140;
@@ -222,7 +222,7 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
           const selfX = fromX + SELF_MESSAGE_WIDTH;
           const boxX = fromX + 5;
           return (
-            <g key={i} onClick={() => onSelect('message', msg.label)} style={{ cursor: 'pointer' }}>
+            <g key={i} onClick={() => onSelect('message', msg.label, msg.lineIndex)} style={{ cursor: 'pointer' }}>
               <rect x={fromX - 1} y={boxY} width={labelWidth + SELF_MESSAGE_WIDTH + 12} height={boxH} rx={4} fill="transparent" />
               <polyline
                 points={`${fromX},${midY} ${selfX},${midY} ${selfX},${midY + 25} ${fromX},${midY + 25}`}
@@ -238,7 +238,7 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
         const midXL = (fromX + toX) / 2;
 
         return (
-          <g key={i} onClick={() => onSelect('message', msg.label)} style={{ cursor: 'pointer' }}>
+          <g key={i} onClick={() => onSelect('message', msg.label, msg.lineIndex)} style={{ cursor: 'pointer' }}>
             <rect x={Math.min(fromX, toX) - 1} y={boxY} width={Math.abs(toX - fromX) + 2} height={boxH} rx={4} fill="transparent" />
             <line x1={fromX} y1={midY} x2={toX} y2={midY} stroke="#555" strokeWidth={1.5} strokeDasharray={msg.type === 'reply' ? '5 3' : 'none'} markerEnd={msg.type === 'reply' ? 'url(#arrow-reply-head)' : 'url(#arrow-sync)'} />
             <rect x={midXL - labelWidth / 2 - 5} y={boxY + (boxH - labelH) / 2} width={labelWidth + 10} height={labelH} rx={4} fill="#fff" stroke="#ddd" strokeWidth={0.5} />

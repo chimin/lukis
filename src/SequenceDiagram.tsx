@@ -2,7 +2,7 @@ import type { DiagramData } from './parser';
 
 interface SequenceDiagramProps {
   data: DiagramData;
-  onSelect: (type: 'participant' | 'message', text: string) => void;
+  onSelect: (type: 'participant' | 'message' | 'divider', text: string) => void;
 }
 
 const PARTICIPANT_WIDTH = 140;
@@ -41,13 +41,14 @@ const NOTE_PAD_Y = 2;
 
 interface RenderItem {
   lineIndex: number;
-  type: 'message' | 'note';
+  type: 'message' | 'note' | 'divider';
   msgIdx?: number;
   noteIdx?: number;
+  dividerIdx?: number;
 }
 
 export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
-  const { participants, messages, title, notes } = data;
+  const { participants, messages, title, notes, dividers } = data;
 
   if (participants.length === 0) {
     return (
@@ -102,33 +103,39 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
   const renderItems: RenderItem[] = [];
   let msgIdx = 0;
   let noteIdx = 0;
-  while (msgIdx < messages.length || noteIdx < notes.length) {
-    if (msgIdx >= messages.length) {
-      renderItems.push({ lineIndex: notes[noteIdx].lineIndex, type: 'note', noteIdx });
+  let divIdx = 0;
+  while (msgIdx < messages.length || noteIdx < notes.length || divIdx < dividers.length) {
+    const msgLine = msgIdx < messages.length ? messages[msgIdx].lineIndex : Infinity;
+    const noteLine = noteIdx < notes.length ? notes[noteIdx].lineIndex : Infinity;
+    const divLine = divIdx < dividers.length ? dividers[divIdx].lineIndex : Infinity;
+    if (msgLine <= noteLine && msgLine <= divLine) {
+      renderItems.push({ lineIndex: msgLine, type: 'message', msgIdx });
+      msgIdx++;
+    } else if (noteLine <= msgLine && noteLine <= divLine) {
+      renderItems.push({ lineIndex: noteLine, type: 'note', noteIdx });
       noteIdx++;
-    } else if (noteIdx >= notes.length) {
-      renderItems.push({ lineIndex: messages[msgIdx].lineIndex, type: 'message', msgIdx });
-      msgIdx++;
-    } else if (messages[msgIdx].lineIndex <= notes[noteIdx].lineIndex) {
-      renderItems.push({ lineIndex: messages[msgIdx].lineIndex, type: 'message', msgIdx });
-      msgIdx++;
     } else {
-      renderItems.push({ lineIndex: notes[noteIdx].lineIndex, type: 'note', noteIdx });
-      noteIdx++;
+      renderItems.push({ lineIndex: divLine, type: 'divider', dividerIdx: divIdx });
+      divIdx++;
     }
   }
 
   const msgPositions: { midY: number; boxH: number }[] = [];
   const notePositions: { y: number; height: number }[] = [];
+  const dividerPositions: { y: number }[] = [];
+  const DIVIDER_HEIGHT = 30;
   let cy = PADDING_TOP + PARTICIPANT_HEIGHT + 30 + titleHeight;
   for (const item of renderItems) {
     if (item.type === 'message') {
       const boxH = getBoxHeight(messages[item.msgIdx!].label);
       msgPositions[item.msgIdx!] = { midY: cy + boxH / 2, boxH };
       cy += boxH;
-    } else {
+    } else if (item.type === 'note') {
       notePositions[item.noteIdx!] = { y: cy, height: NOTE_HEIGHT };
-       cy += NOTE_HEIGHT + NOTE_PAD_Y;
+      cy += NOTE_HEIGHT + NOTE_PAD_Y;
+    } else {
+      dividerPositions[item.dividerIdx!] = { y: cy + DIVIDER_HEIGHT / 2 };
+      cy += DIVIDER_HEIGHT;
     }
   }
   const diagramHeight = cy + PADDING_BOTTOM;
@@ -259,6 +266,18 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
             <rect x={noteX} y={noteY} width={NOTE_WIDTH} height={NOTE_HEIGHT} rx={4} fill="#fff9c4" stroke="#f0c040" strokeWidth={1} />
             <text x={noteX + NOTE_WIDTH / 2} y={noteY + NOTE_HEIGHT / 2 + 4} textAnchor="middle" fill="#666" fontSize={11}>
               {note.text}
+            </text>
+          </g>
+        );
+      })}
+      {dividers.map((divider, i) => {
+        const { y: divY } = dividerPositions[i];
+        return (
+          <g key={`divider-${i}`} onClick={() => onSelect('divider', divider.label)} style={{ cursor: 'pointer' }}>
+            <line x1={40} y1={divY} x2={diagramWidth - 40} y2={divY} stroke="#bbb" strokeWidth={1} strokeDasharray="6 4" />
+            <rect x={diagramWidth / 2 - 40} y={divY - 10} width={80} height={20} rx={4} fill="#f5f5f5" />
+            <text x={diagramWidth / 2} y={divY + 4} textAnchor="middle" fill="#888" fontSize={12}>
+              {divider.label}
             </text>
           </g>
         );

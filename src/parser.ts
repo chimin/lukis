@@ -22,11 +22,17 @@ export interface Note {
   lineIndex: number;
 }
 
+export interface Divider {
+  label: string;
+  lineIndex: number;
+}
+
 export interface DiagramData {
   title: string | null;
   participants: Participant[];
   messages: Message[];
   notes: Note[];
+  dividers: Divider[];
 }
 
 const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
@@ -77,6 +83,7 @@ export function parseDiagram(input: string): DiagramData {
   const participants: Participant[] = [];
   const messages: Message[] = [];
   const notes: Note[] = [];
+  const dividers: Divider[] = [];
   const participantSet = new Set<string>();
   let title: string | null = null;
   const rawLines = input.split('\n');
@@ -111,6 +118,12 @@ export function parseDiagram(input: string): DiagramData {
         text: noteMatch[3],
         lineIndex: i,
       });
+      continue;
+    }
+
+    const dividerMatch = trimmed.match(/^==\s*(.+?)\s*==$/);
+    if (dividerMatch) {
+      dividers.push({ label: dividerMatch[1].trim(), lineIndex: i });
       continue;
     }
 
@@ -155,5 +168,5 @@ export function parseDiagram(input: string): DiagramData {
     }
   }
 
-  return { title, participants, messages, notes };
+  return { title, participants, messages, notes, dividers };
 }

@@ -27,13 +27,16 @@ Server: "validate input
 Server -> Cache: check cache
 note right of Server: Validates before querying
 Cache --> Server: cache miss
+== Database Query ==
 Server -> Database: "SELECT * FROM users
   WHERE email = ?
   LIMIT 1"
 Database --> Server: return row
+== Cache Update ==
 Server -> Cache: "SET user:123
   EX 3600"
 Cache --> Server: OK
+== Response ==
 Server --> Client: "201 Created
   { id: 123, name, email }"`;
 
@@ -110,7 +113,7 @@ function App() {
 
   const diagramData = useMemo(() => parseDiagram(text), [text]);
 
-  const handleSelect = useCallback((type: 'participant' | 'message', text: string) => {
+  const handleSelect = useCallback((type: 'participant' | 'message' | 'divider', text: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -175,6 +178,16 @@ function App() {
             }
             break;
           }
+        }
+        continue;
+      }
+
+      if (type === 'divider') {
+        const dividerMatch = trimmed.match(/^==\s*(.+?)\s*==$/);
+        if (dividerMatch && dividerMatch[1].trim() === text) {
+          const labelStart = lines[i].indexOf(dividerMatch[1].trim());
+          selectAndScroll(textarea, lines, i, labelStart, labelStart + dividerMatch[1].trim().length);
+          return;
         }
         continue;
       }

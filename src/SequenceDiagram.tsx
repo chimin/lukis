@@ -2,6 +2,7 @@ import type { DiagramData } from './parser';
 
 interface SequenceDiagramProps {
   data: DiagramData;
+  onSelect: (type: 'participant' | 'message' | 'note', text: string) => void;
 }
 
 const PARTICIPANT_WIDTH = 140;
@@ -18,7 +19,7 @@ function getTextWidth(text: string): number {
   return text.length * 7.5 + 20;
 }
 
-export function SequenceDiagram({ data }: SequenceDiagramProps) {
+export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
   const { participants, messages, notes } = data;
 
   if (participants.length === 0) {
@@ -61,18 +62,16 @@ export function SequenceDiagram({ data }: SequenceDiagramProps) {
         <marker id="arrow-async" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
         </marker>
-        <marker id="arrow-reply" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="none" stroke="#555" strokeWidth="1.5" />
-        </marker>
         <marker id="arrow-reply-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10" fill="none" stroke="#555" strokeWidth="1.5" />
         </marker>
       </defs>
 
-      {participants.map((p, i) => {
-        const x = 40 + i * (PARTICIPANT_WIDTH + PARTICIPANT_GAP);
+      {participants.map((p) => {
+        const x = getParticipantBoxX(p.name);
+        const displayName = p.alias || p.name;
         return (
-          <g key={p.name}>
+          <g key={p.name} onClick={() => onSelect('participant', p.name)} style={{ cursor: 'pointer' }}>
             <rect
               x={x}
               y={PADDING_TOP}
@@ -91,7 +90,7 @@ export function SequenceDiagram({ data }: SequenceDiagramProps) {
               fontSize={14}
               fontWeight={600}
             >
-              {p.alias || p.name}
+              {displayName}
             </text>
             <line
               x1={x + PARTICIPANT_WIDTH / 2}
@@ -116,7 +115,15 @@ export function SequenceDiagram({ data }: SequenceDiagramProps) {
           const selfX = fromX + SELF_MESSAGE_WIDTH;
           const labelWidth = getTextWidth(msg.label);
           return (
-            <g key={i}>
+            <g key={i} onClick={() => onSelect('message', msg.label)} style={{ cursor: 'pointer' }}>
+              <rect
+                x={fromX - 1}
+                y={y - 14}
+                width={labelWidth + SELF_MESSAGE_WIDTH + 12}
+                height={42}
+                rx={4}
+                fill="transparent"
+              />
               <polyline
                 points={`${fromX},${y} ${selfX},${y} ${selfX},${y + 25} ${fromX},${y + 25}`}
                 fill="none"
@@ -149,9 +156,19 @@ export function SequenceDiagram({ data }: SequenceDiagramProps) {
 
         const labelWidth = getTextWidth(msg.label);
         const midX = (fromX + toX) / 2;
+        const minX = Math.min(fromX, toX);
+        const maxX = Math.max(fromX, toX);
 
         return (
-          <g key={i}>
+          <g key={i} onClick={() => onSelect('message', msg.label)} style={{ cursor: 'pointer' }}>
+            <rect
+              x={minX - 1}
+              y={y - 14}
+              width={maxX - minX + 2}
+              height={28}
+              rx={4}
+              fill="transparent"
+            />
             <line
               x1={fromX}
               y1={y}
@@ -199,7 +216,15 @@ export function SequenceDiagram({ data }: SequenceDiagramProps) {
         }
 
         return (
-          <g key={`note-${i}`}>
+          <g key={`note-${i}`} onClick={() => onSelect('note', note.text)} style={{ cursor: 'pointer' }}>
+            <rect
+              x={noteX - 4}
+              y={msgY - 4}
+              width={NOTE_WIDTH + 8}
+              height={NOTE_HEIGHT + 8}
+              rx={4}
+              fill="transparent"
+            />
             <rect
               x={noteX}
               y={msgY}

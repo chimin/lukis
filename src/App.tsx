@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { parseDiagram } from './parser';
 import { SequenceDiagram } from './SequenceDiagram';
 
@@ -7,9 +7,7 @@ const DEFAULT_TEXT = `# Sequence Diagram Editor
 #   participant Name [as Alias]
 #   A -> B: message       (sync call)
 #   A --> B: message      (async call)
-#   A -->> B: message     (async call)
 #   A <-- B: message      (return)
-#   A <<-- B: message     (return)
 #   note left of A: text
 #   note right of B: text
 #   note over A: text
@@ -24,16 +22,97 @@ Database --> Server: return results
 Server --> Client: send response
 note right of Server: Processes the request`;
 
+function selectAndScroll(
+  textarea: HTMLTextAreaElement,
+  lines: string[],
+  lineIdx: number,
+  selStart: number,
+  selEnd: number
+) {
+  const lineStart = lines.slice(0, lineIdx).reduce((sum, l) => sum + l.length + 1, 0);
+  const absStart = lineStart + selStart;
+  const absEnd = lineStart + selEnd;
+
+  textarea.focus();
+  textarea.setSelectionRange(absStart, absEnd);
+
+  const lineHeight = 22;
+  const scrollTarget = lineIdx * lineHeight - textarea.clientHeight / 2 + lineHeight;
+  textarea.scrollTop = Math.max(0, scrollTarget);
+}
+
 function App() {
   const [text, setText] = useState(DEFAULT_TEXT);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const diagramData = useMemo(() => parseDiagram(text), [text]);
+
+  const handleSelect = useCallback((type: 'participant' | 'message' | 'note', text: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const lines = textarea.value.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (type === 'participant') {
+        const participantMatch = trimmed.match(/^participant\s+"?([^"\s]+)"?(?:\s+as\s+(\w+))?$/i);
+        if (participantMatch) {
+          const name = participantMatch[1];
+          if (name === text) {
+            const nameStart = line.indexOf(name);
+            selectAndScroll(textarea, lines, i, nameStart, nameStart + name.length);
+            return;
+          }
+        }
+        continue;
+      }
+
+      if (type === 'message') {
+        for (const regex of [
+          /^(.+?)\s*-->\s*(.+?)\s*:\s*(.+)$/,
+          /^(.+?)\s*->>\s*(.+?)\s*:\s*(.+)$/,
+          /^(.+?)\s*<--\s*(.+?)\s*:\s*(.+)$/,
+          /^(.+?)\s*<<--\s*(.+?)\s*:\s*(.+)$/,
+          /^(.+?)\s*->\s*(.+?)\s*:\s*(.+)$/,
+        ]) {
+          const match = trimmed.match(regex);
+          if (match) {
+            const label = match[3].trim();
+            if (label === text) {
+              const labelStart = line.indexOf(label, line.indexOf(':'));
+              selectAndScroll(textarea, lines, i, labelStart, labelStart + label.length);
+              return;
+            }
+            break;
+          }
+        }
+        continue;
+      }
+
+      if (type === 'note') {
+        const noteMatch = trimmed.match(/^note\s+(left|right|over)\s+(?:of\s+)?(\w+)\s*:\s*(.+)$/i);
+        if (noteMatch) {
+          const noteText = noteMatch[3].trim();
+          if (noteText === text) {
+            const textStart = line.indexOf(noteText, line.indexOf(':'));
+            selectAndScroll(textarea, lines, i, textStart, textStart + noteText.length);
+            return;
+          }
+        }
+        continue;
+      }
+    }
+  }, []);
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.title}>Sequence Diagram Editor</h1>
-        <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right</p>
+        <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right. Click a label or participant in the preview to select its source text.</p>
       </header>
       <div style={styles.editorContainer}>
         <div style={styles.pane}>
@@ -41,6 +120,7 @@ function App() {
             <span style={styles.paneLabel}>Editor</span>
           </div>
           <textarea
+            ref={textareaRef}
             style={styles.textarea}
             value={text}
             onChange={e => setText(e.target.value)}
@@ -54,7 +134,7 @@ function App() {
             <span style={styles.paneLabel}>Preview</span>
           </div>
           <div style={styles.preview}>
-            <SequenceDiagram data={diagramData} />
+            <SequenceDiagram data={diagramData} onSelect={handleSelect} />
           </div>
         </div>
       </div>

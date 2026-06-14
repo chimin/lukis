@@ -35,8 +35,19 @@ function getBoxHeight(label: string): number {
   return Math.max(getLabelHeight(label) + LABEL_PAD_Y * 2, MIN_BOX_HEIGHT);
 }
 
+const NOTE_WIDTH = 140;
+const NOTE_HEIGHT = 28;
+const NOTE_PAD_Y = 2;
+
+interface RenderItem {
+  lineIndex: number;
+  type: 'message' | 'note';
+  msgIdx?: number;
+  noteIdx?: number;
+}
+
 export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
-  const { participants, messages, title } = data;
+  const { participants, messages, title, notes } = data;
 
   if (participants.length === 0) {
     return (
@@ -88,12 +99,37 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
 
   const diagramWidth = participantBoxX[participantBoxX.length - 1] + PARTICIPANT_WIDTH + 40;
 
+  const renderItems: RenderItem[] = [];
+  let msgIdx = 0;
+  let noteIdx = 0;
+  while (msgIdx < messages.length || noteIdx < notes.length) {
+    if (msgIdx >= messages.length) {
+      renderItems.push({ lineIndex: notes[noteIdx].lineIndex, type: 'note', noteIdx });
+      noteIdx++;
+    } else if (noteIdx >= notes.length) {
+      renderItems.push({ lineIndex: messages[msgIdx].lineIndex, type: 'message', msgIdx });
+      msgIdx++;
+    } else if (messages[msgIdx].lineIndex <= notes[noteIdx].lineIndex) {
+      renderItems.push({ lineIndex: messages[msgIdx].lineIndex, type: 'message', msgIdx });
+      msgIdx++;
+    } else {
+      renderItems.push({ lineIndex: notes[noteIdx].lineIndex, type: 'note', noteIdx });
+      noteIdx++;
+    }
+  }
+
   const msgPositions: { midY: number; boxH: number }[] = [];
+  const notePositions: { y: number; height: number }[] = [];
   let cy = PADDING_TOP + PARTICIPANT_HEIGHT + 30 + titleHeight;
-  for (const msg of messages) {
-    const boxH = getBoxHeight(msg.label);
-    msgPositions.push({ midY: cy + boxH / 2, boxH });
-    cy += boxH;
+  for (const item of renderItems) {
+    if (item.type === 'message') {
+      const boxH = getBoxHeight(messages[item.msgIdx!].label);
+      msgPositions[item.msgIdx!] = { midY: cy + boxH / 2, boxH };
+      cy += boxH;
+    } else {
+      notePositions[item.noteIdx!] = { y: cy, height: NOTE_HEIGHT };
+       cy += NOTE_HEIGHT + NOTE_PAD_Y;
+    }
   }
   const diagramHeight = cy + PADDING_BOTTOM;
 
@@ -200,6 +236,30 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
             <line x1={fromX} y1={midY} x2={toX} y2={midY} stroke="#555" strokeWidth={1.5} strokeDasharray={msg.type === 'reply' ? '5 3' : 'none'} markerEnd={msg.type === 'reply' ? 'url(#arrow-reply-head)' : 'url(#arrow-sync)'} />
             <rect x={midXL - labelWidth / 2 - 5} y={boxY + (boxH - labelH) / 2} width={labelWidth + 10} height={labelH} rx={4} fill="#fff" stroke="#ddd" strokeWidth={0.5} />
             {renderLabel(msg.label, midXL, boxY)}
+          </g>
+        );
+      })}
+
+      {notes.map((note, i) => {
+        const { y: noteY } = notePositions[i];
+        const pIdx = getParticipantIdx(note.participant);
+         const pCenterX = pIdx >= 0 ? participantX[pIdx] : diagramWidth / 2;
+
+         let noteX: number;
+        if (note.position === 'left') {
+          noteX = pCenterX - NOTE_WIDTH - NOTE_PAD_Y;
+        } else if (note.position === 'right') {
+          noteX = pCenterX + NOTE_PAD_Y;
+        } else {
+          noteX = pCenterX - NOTE_WIDTH / 2;
+        }
+
+        return (
+          <g key={`note-${i}`} onClick={() => onSelect('message', note.text)} style={{ cursor: 'pointer' }}>
+            <rect x={noteX} y={noteY} width={NOTE_WIDTH} height={NOTE_HEIGHT} rx={4} fill="#fff9c4" stroke="#f0c040" strokeWidth={1} />
+            <text x={noteX + NOTE_WIDTH / 2} y={noteY + NOTE_HEIGHT / 2 + 4} textAnchor="middle" fill="#666" fontSize={11}>
+              {note.text}
+            </text>
           </g>
         );
       })}

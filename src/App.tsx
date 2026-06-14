@@ -25,6 +25,7 @@ Client -> Server: "POST /api/users
 Server: "validate input
   and check permissions"
 Server -> Cache: check cache
+note right of Server: Validates before querying
 Cache --> Server: cache miss
 Server -> Database: "SELECT * FROM users
   WHERE email = ?
@@ -134,6 +135,13 @@ function App() {
       }
 
       if (type === 'message') {
+        const noteMatch = trimmed.match(/^note\s+(?:left|right|over)\s+(?:of\s+)?\w+\s*:\s*(.+)$/i);
+        if (noteMatch && noteMatch[1].trim() === text) {
+          const labelStart = lines[i].indexOf(noteMatch[1].trim(), lines[i].indexOf(':'));
+          selectAndScroll(textarea, lines, i, labelStart, labelStart + noteMatch[1].trim().length);
+          return;
+        }
+
         const titleMatch = trimmed.match(/^title\s+(.+)$/i);
         if (titleMatch && titleMatch[1].trim() === text) {
           const labelStart = lines[i].indexOf(titleMatch[1].trim());

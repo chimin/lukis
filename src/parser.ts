@@ -15,10 +15,18 @@ export interface Message {
   lastLineIndex: number;
 }
 
+export interface Note {
+  position: 'left' | 'right' | 'over';
+  participant: string;
+  text: string;
+  lineIndex: number;
+}
+
 export interface DiagramData {
   title: string | null;
   participants: Participant[];
   messages: Message[];
+  notes: Note[];
 }
 
 const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
@@ -68,6 +76,7 @@ function mergeQuotedLines(lines: string[]): { text: string; originalIndex: numbe
 export function parseDiagram(input: string): DiagramData {
   const participants: Participant[] = [];
   const messages: Message[] = [];
+  const notes: Note[] = [];
   const participantSet = new Set<string>();
   let title: string | null = null;
   const rawLines = input.split('\n');
@@ -91,6 +100,17 @@ export function parseDiagram(input: string): DiagramData {
         participantSet.add(name);
         participants.push({ name, alias, lineIndex: i });
       }
+      continue;
+    }
+
+    const noteMatch = trimmed.match(/^note\s+(left|right|over)\s+(?:of\s+)?(\w+)\s*:\s*(.+)$/i);
+    if (noteMatch) {
+      notes.push({
+        position: noteMatch[1] as 'left' | 'right' | 'over',
+        participant: noteMatch[2],
+        text: noteMatch[3],
+        lineIndex: i,
+      });
       continue;
     }
 
@@ -135,5 +155,5 @@ export function parseDiagram(input: string): DiagramData {
     }
   }
 
-  return { title, participants, messages };
+  return { title, participants, messages, notes };
 }

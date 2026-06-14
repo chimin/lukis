@@ -7,7 +7,7 @@ interface SequenceDiagramProps {
 
 const PARTICIPANT_WIDTH = 140;
 const PARTICIPANT_HEIGHT = 40;
-const PARTICIPANT_GAP = 60;
+const BASE_GAP = 60;
 const LINE_HEIGHT = 14;
 const PADDING_TOP = 30;
 const PADDING_BOTTOM = 60;
@@ -16,6 +16,7 @@ const MIN_LABEL_WIDTH = 100;
 const LABEL_PAD_X = 10;
 const LABEL_PAD_Y = 6;
 const MIN_BOX_HEIGHT = 24;
+const ARROW_HEAD = 16;
 
 function getTextWidth(text: string): number {
   const maxLine = text.split('\n').reduce((max, l) => Math.max(max, l.length), 0);
@@ -45,36 +46,61 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
     );
   }
 
-  const diagramWidth = participants.length * PARTICIPANT_WIDTH + (participants.length - 1) * PARTICIPANT_GAP + 80;
-  const contentHeight = messages.reduce((sum, m) => sum + getBoxHeight(m.label), 0);
-  const diagramHeight = PADDING_TOP + PARTICIPANT_HEIGHT + Math.max(contentHeight, 100) + PADDING_BOTTOM;
+  const getParticipantIdx = (name: string) => participants.findIndex(p => p.name === name);
 
-  const getParticipantX = (name: string): number => {
-    const idx = participants.findIndex(p => p.name === name);
-    if (idx === -1) return 40;
-    return 40 + idx * (PARTICIPANT_WIDTH + PARTICIPANT_GAP) + PARTICIPANT_WIDTH / 2;
-  };
+  const gaps: number[] = [];
+  for (let i = 0; i < participants.length - 1; i++) {
+    let gap = BASE_GAP;
 
-  const getParticipantBoxX = (name: string): number => {
-    const idx = participants.findIndex(p => p.name === name);
-    if (idx === -1) return 40;
-    return 40 + idx * (PARTICIPANT_WIDTH + PARTICIPANT_GAP);
-  };
+    for (const msg of messages) {
+      if (msg.from === msg.to) continue;
+      const fromIdx = getParticipantIdx(msg.from);
+      const toIdx = getParticipantIdx(msg.to);
+      if (fromIdx === -1 || toIdx === -1) continue;
+      const minIdx = Math.min(fromIdx, toIdx);
+      const maxIdx = Math.max(fromIdx, toIdx);
+      if (minIdx > i || maxIdx < i + 1) continue;
 
-  const lineY = PADDING_TOP + PARTICIPANT_HEIGHT;
+      const labelW = getTextWidth(msg.label);
+      const minSpace = labelW + ARROW_HEAD * 2 + 10;
+      const minGap = minSpace - PARTICIPANT_WIDTH;
+      if (minGap > gap) {
+        gap = minGap;
+      }
+    }
+    gaps.push(gap);
+  }
+
+  const participantX: number[] = [];
+  let px = 40;
+  for (let i = 0; i < participants.length; i++) {
+    participantX.push(px + PARTICIPANT_WIDTH / 2);
+    px += PARTICIPANT_WIDTH + (gaps[i] ?? BASE_GAP);
+  }
+
+  const participantBoxX: number[] = [];
+  let bx = 40;
+  for (let i = 0; i < participants.length; i++) {
+    participantBoxX.push(bx);
+    bx += PARTICIPANT_WIDTH + (gaps[i] ?? BASE_GAP);
+  }
+
+  const diagramWidth = participantBoxX[participantBoxX.length - 1] + PARTICIPANT_WIDTH + 40;
 
   const msgPositions: { midY: number; boxH: number }[] = [];
-  let cy = lineY + 30;
+  let cy = PADDING_TOP + PARTICIPANT_HEIGHT + 30;
   for (const msg of messages) {
     const boxH = getBoxHeight(msg.label);
     msgPositions.push({ midY: cy + boxH / 2, boxH });
     cy += boxH;
   }
+  const diagramHeight = cy + PADDING_BOTTOM;
 
-  const renderLabel = (label: string, cx: number, topY: number) => {
+  const renderLabel = (label: string, cx: number, boxY: number) => {
     const lines = getLabelLines(label);
     const totalH = lines.length * LINE_HEIGHT;
-    const startY = topY + (getBoxHeight(label) - totalH) / 2 + LINE_HEIGHT - 2;
+    const boxH = getBoxHeight(label);
+    const startY = boxY + (boxH - totalH) / 2 + LINE_HEIGHT - 2;
 
     if (lines.length === 1) {
       return (
@@ -86,11 +112,7 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
     return (
       <text x={cx} textAnchor="middle" fill="#333" fontSize={12}>
         {lines.map((l, idx) => (
-          <tspan
-            key={idx}
-            x={cx}
-            y={startY + idx * LINE_HEIGHT}
-          >
+          <tspan key={idx} x={cx} y={startY + idx * LINE_HEIGHT}>
             {l}
           </tspan>
         ))}
@@ -114,8 +136,8 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
         </marker>
       </defs>
 
-      {participants.map((p) => {
-        const x = getParticipantBoxX(p.name);
+      {participants.map((p, i) => {
+        const x = participantBoxX[i];
         const displayName = p.alias || p.name;
         return (
           <g key={p.name} onClick={() => onSelect('participant', p.name)} style={{ cursor: 'pointer' }}>
@@ -123,23 +145,23 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
             <text x={x + PARTICIPANT_WIDTH / 2} y={PADDING_TOP + PARTICIPANT_HEIGHT / 2 + 5} textAnchor="middle" fill="white" fontSize={14} fontWeight={600}>
               {displayName}
             </text>
-            <line x1={x + PARTICIPANT_WIDTH / 2} y1={PADDING_TOP + PARTICIPANT_HEIGHT} x2={x + PARTICIPANT_WIDTH / 2} y2={diagramHeight - 20} stroke="#bbb" strokeWidth={1} strokeDasharray="4 4" />
+            <line x1={participantX[i]} y1={PADDING_TOP + PARTICIPANT_HEIGHT} x2={participantX[i]} y2={diagramHeight - 20} stroke="#bbb" strokeWidth={1} strokeDasharray="4 4" />
           </g>
         );
       })}
 
       {messages.map((msg, i) => {
         const { midY, boxH } = msgPositions[i];
-        const fromX = getParticipantX(msg.from);
-        const toX = getParticipantX(msg.to);
+        const fromX = participantX[getParticipantIdx(msg.from)];
+        const toX = participantX[getParticipantIdx(msg.to)];
         const isSelf = msg.from === msg.to;
         const labelWidth = getTextWidth(msg.label);
         const labelH = getLabelHeight(msg.label);
+        const boxY = midY - boxH / 2;
 
         if (isSelf) {
           const selfX = fromX + SELF_MESSAGE_WIDTH;
           const boxX = fromX + 5;
-          const boxY = midY - boxH / 2;
           return (
             <g key={i} onClick={() => onSelect('message', msg.label)} style={{ cursor: 'pointer' }}>
               <rect x={fromX - 1} y={boxY} width={labelWidth + SELF_MESSAGE_WIDTH + 12} height={boxH} rx={4} fill="transparent" />
@@ -155,13 +177,10 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
         }
 
         const midXL = (fromX + toX) / 2;
-        const minX = Math.min(fromX, toX);
-        const maxX = Math.max(fromX, toX);
-        const boxY = midY - boxH / 2;
 
         return (
           <g key={i} onClick={() => onSelect('message', msg.label)} style={{ cursor: 'pointer' }}>
-            <rect x={minX - 1} y={boxY} width={maxX - minX + 2} height={boxH} rx={4} fill="transparent" />
+            <rect x={Math.min(fromX, toX) - 1} y={boxY} width={Math.abs(toX - fromX) + 2} height={boxH} rx={4} fill="transparent" />
             <line x1={fromX} y1={midY} x2={toX} y2={midY} stroke="#555" strokeWidth={1.5} strokeDasharray={msg.type === 'reply' ? '5 3' : 'none'} markerEnd={msg.type === 'reply' ? 'url(#arrow-reply-head)' : 'url(#arrow-sync)'} />
             <rect x={midXL - labelWidth / 2 - 5} y={boxY + (boxH - labelH) / 2} width={labelWidth + 10} height={labelH} rx={4} fill="#fff" stroke="#ddd" strokeWidth={0.5} />
             {renderLabel(msg.label, midXL, boxY)}

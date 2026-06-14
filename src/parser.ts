@@ -35,6 +35,7 @@ const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
   { regex: /^(.+?)\s*<--\s*(.+?)\s*:\s*(.+)$/, type: 'reply' },
   { regex: /^(.+?)\s*<<--\s*(.+?)\s*:\s*(.+)$/, type: 'reply' },
   { regex: /^(.+?)\s*->\s*(.+?)\s*:\s*(.+)$/, type: 'sync' },
+  { regex: /^(\w+)\s*:\s*(.+)$/, type: 'self' },
 ];
 
 export function parseDiagram(input: string): DiagramData {
@@ -76,9 +77,17 @@ export function parseDiagram(input: string): DiagramData {
     for (const { regex, type } of ARROW_PATTERNS) {
       const match = line.match(regex);
       if (match) {
-        const from = match[1].trim();
-        const to = match[2].trim();
-        const label = match[3].trim();
+        let from: string, to: string, label: string;
+
+        if (type === 'self') {
+          from = match[1].trim();
+          to = from;
+          label = match[2].trim();
+        } else {
+          from = match[1].trim();
+          to = match[2].trim();
+          label = match[3].trim();
+        }
 
         if (!participantSet.has(from)) {
           participantSet.add(from);
@@ -90,9 +99,8 @@ export function parseDiagram(input: string): DiagramData {
         }
 
         const colonIdx = line.indexOf(':');
-        const msgType = from === to ? 'self' : type;
         messages.push({
-          from, to, label, type: msgType, lineIndex: i,
+          from, to, label, type, lineIndex: i,
           labelStart: colonIdx + 1,
           labelEnd: line.length,
         });

@@ -8,6 +8,7 @@ const DEFAULT_TEXT = `# Sequence Diagram Editor
 #   A -> B: message       (sync call)
 #   A --> B: message      (async call)
 #   A <-- B: message      (return)
+#   A: message              (self-message)
 #   note left of A: text
 #   note right of B: text
 #   note over A: text
@@ -17,6 +18,7 @@ participant Server
 participant Database
 
 Client -> Server: send API request
+Server: validate input
 Server -> Database: query data
 Database --> Server: return results
 Server --> Client: send response
@@ -78,10 +80,11 @@ function App() {
           /^(.+?)\s*<--\s*(.+?)\s*:\s*(.+)$/,
           /^(.+?)\s*<<--\s*(.+?)\s*:\s*(.+)$/,
           /^(.+?)\s*->\s*(.+?)\s*:\s*(.+)$/,
+          /^(\w+)\s*:\s*(.+)$/,
         ]) {
           const match = trimmed.match(regex);
           if (match) {
-            const label = match[3].trim();
+            const label = match[3] ? match[3].trim() : match[2].trim();
             if (label === text) {
               const labelStart = line.indexOf(label, line.indexOf(':'));
               selectAndScroll(textarea, lines, i, labelStart, labelStart + label.length);

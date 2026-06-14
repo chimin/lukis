@@ -85,6 +85,22 @@ function findQuotedBlock(fullText: string, startLineIdx: number, labelText: stri
   return null;
 }
 
+function isCursorInsideQuotes(allLines: string[], lineIdx: number, colIdx: number) {
+  let textBeforeCursor = '';
+  for (let i = 0; i < lineIdx; i++) {
+    textBeforeCursor += allLines[i] + '\n';
+  }
+  textBeforeCursor += allLines[lineIdx].substring(0, colIdx);
+
+  let inString = false;
+  for (let i = 0; i < textBeforeCursor.length; i++) {
+    if (textBeforeCursor[i] === '"') {
+      inString = !inString;
+    }
+  }
+  return inString;
+}
+
 function App() {
   const [text, setText] = useState(DEFAULT_TEXT);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -164,6 +180,75 @@ function App() {
             style={styles.textarea}
             value={text}
             onChange={e => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              const ta = textareaRef.current;
+              if (!ta) return;
+              const pos = ta.selectionStart;
+              const allLines = ta.value.split('\n');
+              const textBeforeCursor = ta.value.substring(0, pos);
+              const linesBeforeCursor = textBeforeCursor.split('\n');
+              const curLineIdx = linesBeforeCursor.length - 1;
+              const curColIdx = linesBeforeCursor[curLineIdx].length;
+              const currentLine = linesBeforeCursor[curLineIdx];
+              const inQuotes = isCursorInsideQuotes(allLines, curLineIdx, curColIdx);
+
+              const selfMatch = currentLine.match(/^\s*(\w+)\s*:\s*(.*)$/);
+              if (selfMatch) {
+                if (inQuotes) return;
+                e.preventDefault();
+                const prefix = '\n' + selfMatch[1] + ': ';
+                const newValue = ta.value.substring(0, pos) + prefix + ta.value.substring(ta.selectionEnd);
+                setText(newValue);
+                setTimeout(() => {
+                  ta.selectionStart = ta.selectionEnd = pos + prefix.length;
+                }, 0);
+                return;
+              }
+
+              const arrowMatch = currentLine.match(/^\s*(\w+)\s*(--?>?>?|<<?--?)\s*(\w+)\s*:\s*(.*)$/);
+              if (arrowMatch) {
+                if (inQuotes) return;
+                e.preventDefault();
+                const prefix = '\n' + arrowMatch[3] + ': ';
+                const newValue = ta.value.substring(0, pos) + prefix + ta.value.substring(ta.selectionEnd);
+                setText(newValue);
+                setTimeout(() => {
+                  ta.selectionStart = ta.selectionEnd = pos + prefix.length;
+                }, 0);
+                return;
+              }
+
+              let blockTarget = '';
+              {
+                const quoteLines: number[] = [];
+                for (let i = curLineIdx; i >= 0; i--) {
+                  if (allLines[i].includes('"')) quoteLines.unshift(i);
+                }
+                for (let k = 0; k < quoteLines.length; k++) {
+                  const i = quoteLines[k];
+                  const startLine = allLines[i];
+                  const startSelf = startLine.match(/^\s*(\w+)\s*:/);
+                  const startArrow = startLine.match(/^\s*(\w+)\s*(?:--?>?>?|<<?--?)\s*(\w+)\s*:/);
+                  let target = '';
+                  if (startSelf) target = startSelf[1];
+                  else if (startArrow) target = startArrow[2];
+                  if (target) {
+                    blockTarget = target;
+                    break;
+                  }
+                }
+              }
+              if (blockTarget) {
+                e.preventDefault();
+                const prefix = '\n' + blockTarget + ': ';
+                const newValue = ta.value.substring(0, pos) + prefix + ta.value.substring(ta.selectionEnd);
+                setText(newValue);
+                setTimeout(() => {
+                  ta.selectionStart = ta.selectionEnd = pos + prefix.length;
+                }, 0);
+              }
+            }}
             spellCheck={false}
             placeholder="Enter sequence diagram syntax..."
           />

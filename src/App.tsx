@@ -12,6 +12,8 @@ const DEFAULT_TEXT = `# Sequence Diagram Editor
 #   A -> B: "multiline
 #     description"
 
+title User Registration Flow
+
 participant Client
 participant Server
 participant Database
@@ -132,6 +134,13 @@ function App() {
       }
 
       if (type === 'message') {
+        const titleMatch = trimmed.match(/^title\s+(.+)$/i);
+        if (titleMatch && titleMatch[1].trim() === text) {
+          const labelStart = lines[i].indexOf(titleMatch[1].trim());
+          selectAndScroll(textarea, lines, i, labelStart, labelStart + titleMatch[1].trim().length);
+          return;
+        }
+
         for (const regex of [
           /^(.+?)\s*-->\s*(.+?)\s*:\s*(.+)$/,
           /^(.+?)\s*->>\s*(.+?)\s*:\s*(.+)$/,

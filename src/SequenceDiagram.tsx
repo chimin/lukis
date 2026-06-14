@@ -36,7 +36,7 @@ function getBoxHeight(label: string): number {
 }
 
 export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
-  const { participants, messages } = data;
+  const { participants, messages, title } = data;
 
   if (participants.length === 0) {
     return (
@@ -46,12 +46,14 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
     );
   }
 
+  const titleHeight = title ? 40 : 0;
+  const vOffset = titleHeight; // shift everything down when title is present
+
   const getParticipantIdx = (name: string) => participants.findIndex(p => p.name === name);
 
   const gaps: number[] = [];
   for (let i = 0; i < participants.length - 1; i++) {
     let gap = BASE_GAP;
-
     for (const msg of messages) {
       if (msg.from === msg.to) continue;
       const fromIdx = getParticipantIdx(msg.from);
@@ -60,7 +62,6 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
       const minIdx = Math.min(fromIdx, toIdx);
       const maxIdx = Math.max(fromIdx, toIdx);
       if (minIdx > i || maxIdx < i + 1) continue;
-
       const labelW = getTextWidth(msg.label);
       const minSpace = labelW + ARROW_HEAD * 2 + 10;
       const minGap = minSpace - PARTICIPANT_WIDTH;
@@ -88,7 +89,7 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
   const diagramWidth = participantBoxX[participantBoxX.length - 1] + PARTICIPANT_WIDTH + 40;
 
   const msgPositions: { midY: number; boxH: number }[] = [];
-  let cy = PADDING_TOP + PARTICIPANT_HEIGHT + 30;
+  let cy = PADDING_TOP + PARTICIPANT_HEIGHT + 30 + titleHeight;
   for (const msg of messages) {
     const boxH = getBoxHeight(msg.label);
     msgPositions.push({ midY: cy + boxH / 2, boxH });
@@ -136,16 +137,31 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
         </marker>
       </defs>
 
+      {title && (
+        <text
+          x={diagramWidth / 2}
+          y={PADDING_TOP + 20}
+          textAnchor="middle"
+          fill="#1a1a2e"
+          fontSize={16}
+          fontWeight={700}
+          style={{ cursor: 'pointer' }}
+          onClick={() => onSelect('message', title)}
+        >
+          {title}
+        </text>
+      )}
+
       {participants.map((p, i) => {
         const x = participantBoxX[i];
         const displayName = p.alias || p.name;
         return (
           <g key={p.name} onClick={() => onSelect('participant', p.name)} style={{ cursor: 'pointer' }}>
-            <rect x={x} y={PADDING_TOP} width={PARTICIPANT_WIDTH} height={PARTICIPANT_HEIGHT} rx={6} fill="#4a90d9" stroke="#357abd" strokeWidth={1} />
-            <text x={x + PARTICIPANT_WIDTH / 2} y={PADDING_TOP + PARTICIPANT_HEIGHT / 2 + 5} textAnchor="middle" fill="white" fontSize={14} fontWeight={600}>
+            <rect x={x} y={PADDING_TOP + vOffset} width={PARTICIPANT_WIDTH} height={PARTICIPANT_HEIGHT} rx={6} fill="#4a90d9" stroke="#357abd" strokeWidth={1} />
+            <text x={x + PARTICIPANT_WIDTH / 2} y={PADDING_TOP + vOffset + PARTICIPANT_HEIGHT / 2 + 5} textAnchor="middle" fill="white" fontSize={14} fontWeight={600}>
               {displayName}
             </text>
-            <line x1={participantX[i]} y1={PADDING_TOP + PARTICIPANT_HEIGHT} x2={participantX[i]} y2={diagramHeight - 20} stroke="#bbb" strokeWidth={1} strokeDasharray="4 4" />
+            <line x1={participantX[i]} y1={PADDING_TOP + vOffset + PARTICIPANT_HEIGHT} x2={participantX[i]} y2={diagramHeight - 20} stroke="#bbb" strokeWidth={1} strokeDasharray="4 4" />
           </g>
         );
       })}

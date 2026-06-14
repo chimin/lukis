@@ -16,6 +16,7 @@ export interface Message {
 }
 
 export interface DiagramData {
+  title: string | null;
   participants: Participant[];
   messages: Message[];
 }
@@ -68,12 +69,19 @@ export function parseDiagram(input: string): DiagramData {
   const participants: Participant[] = [];
   const messages: Message[] = [];
   const participantSet = new Set<string>();
+  let title: string | null = null;
   const rawLines = input.split('\n');
   const mergedLines = mergeQuotedLines(rawLines);
 
   for (const { text: line, originalIndex: i, lastOriginalIndex } of mergedLines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const titleMatch = trimmed.match(/^title\s+(.+)$/i);
+    if (titleMatch && !title) {
+      title = titleMatch[1].trim();
+      continue;
+    }
 
     const participantMatch = trimmed.match(/^participant\s+"?([^"\s]+)"?(?:\s+as\s+(\w+))?$/i);
     if (participantMatch) {
@@ -127,5 +135,5 @@ export function parseDiagram(input: string): DiagramData {
     }
   }
 
-  return { participants, messages };
+  return { title, participants, messages };
 }

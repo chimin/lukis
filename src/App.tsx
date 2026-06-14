@@ -1,122 +1,140 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useMemo } from 'react';
+import { parseDiagram } from './parser';
+import { SequenceDiagram } from './SequenceDiagram';
+
+const DEFAULT_TEXT = `# Sequence Diagram Editor
+# Syntax:
+#   participant Name [as Alias]
+#   A -> B: message       (sync call)
+#   A --> B: message      (async call)
+#   A -->> B: message     (async call)
+#   A <-- B: message      (return)
+#   A <<-- B: message     (return)
+#   note left of A: text
+#   note right of B: text
+#   note over A: text
+
+participant Client
+participant Server
+participant Database
+
+Client -> Server: send API request
+Server -> Database: query data
+Database --> Server: return results
+Server --> Client: send response
+note right of Server: Processes the request`;
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [text, setText] = useState(DEFAULT_TEXT);
+
+  const diagramData = useMemo(() => parseDiagram(text), [text]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <h1 style={styles.title}>Sequence Diagram Editor</h1>
+        <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right</p>
+      </header>
+      <div style={styles.editorContainer}>
+        <div style={styles.pane}>
+          <div style={styles.paneHeader}>
+            <span style={styles.paneLabel}>Editor</span>
+          </div>
+          <textarea
+            style={styles.textarea}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            spellCheck={false}
+            placeholder="Enter sequence diagram syntax..."
+          />
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+        <div style={styles.divider} />
+        <div style={styles.pane}>
+          <div style={styles.paneHeader}>
+            <span style={styles.paneLabel}>Preview</span>
+          </div>
+          <div style={styles.preview}>
+            <SequenceDiagram data={diagramData} />
+          </div>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      </div>
+    </div>
+  );
 }
 
-export default App
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    padding: '16px 24px',
+    backgroundColor: '#fff',
+    borderBottom: '1px solid #e0e0e0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+  },
+  title: {
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 700,
+    color: '#1a1a2e',
+  },
+  subtitle: {
+    margin: '4px 0 0',
+    fontSize: 14,
+    color: '#666',
+  },
+  editorContainer: {
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+  },
+  pane: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  paneHeader: {
+    padding: '10px 16px',
+    borderBottom: '1px solid #e8e8e8',
+    backgroundColor: '#fafafa',
+  },
+  paneLabel: {
+    fontSize: 12,
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: '#888',
+  },
+  textarea: {
+    flex: 1,
+    padding: 16,
+    border: 'none',
+    outline: 'none',
+    resize: 'none',
+    fontFamily: "ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: '#333',
+    backgroundColor: '#fdfdfd',
+    tabSize: 2,
+  },
+  divider: {
+    width: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  preview: {
+    flex: 1,
+    padding: 16,
+    overflow: 'auto',
+    backgroundColor: '#fff',
+    minHeight: 0,
+  },
+};
+
+export default App;

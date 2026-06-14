@@ -11,6 +11,9 @@ const DEFAULT_TEXT = `# Sequence Diagram Editor
 #   A: message              (self-message)
 #   A -> B: "multiline
 #     description"
+#   note left/right/over A: text
+#   == Section ==
+#   activate/deactivate A
 
 title User Registration Flow
 
@@ -22,23 +25,31 @@ participant Cache
 Client -> Server: "POST /api/users
   Content-Type: application/json
   { name, email }"
+activate Server
 Server: "validate input
   and check permissions"
+note left of Client: User waits for response
 Server -> Cache: check cache
 note right of Server: Validates before querying
 Cache --> Server: cache miss
 == Database Query ==
+activate Database
 Server -> Database: "SELECT * FROM users
   WHERE email = ?
   LIMIT 1"
 Database --> Server: return row
+deactivate Database
 == Cache Update ==
+activate Cache
 Server -> Cache: "SET user:123
   EX 3600"
 Cache --> Server: OK
+deactivate Cache
 == Response ==
 Server --> Client: "201 Created
-  { id: 123, name, email }"`;
+  { id: 123, name, email }"
+deactivate Server
+note over Server,Database: Registration complete`;
 
 function selectAndScroll(
   textarea: HTMLTextAreaElement,

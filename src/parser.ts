@@ -27,12 +27,19 @@ export interface Divider {
   lineIndex: number;
 }
 
+export interface Activation {
+  participant: string;
+  lineIndex: number;
+  type: 'activate' | 'deactivate';
+}
+
 export interface DiagramData {
   title: string | null;
   participants: Participant[];
   messages: Message[];
   notes: Note[];
   dividers: Divider[];
+  activations: Activation[];
 }
 
 const ARROW_PATTERNS: { regex: RegExp; type: Message['type'] }[] = [
@@ -84,6 +91,7 @@ export function parseDiagram(input: string): DiagramData {
   const messages: Message[] = [];
   const notes: Note[] = [];
   const dividers: Divider[] = [];
+  const activations: Activation[] = [];
   const participantSet = new Set<string>();
   let title: string | null = null;
   const rawLines = input.split('\n');
@@ -124,6 +132,18 @@ export function parseDiagram(input: string): DiagramData {
     const dividerMatch = trimmed.match(/^==\s*(.+?)\s*==$/);
     if (dividerMatch) {
       dividers.push({ label: dividerMatch[1].trim(), lineIndex: i });
+      continue;
+    }
+
+    const activateMatch = trimmed.match(/^activate\s+(\w+)$/i);
+    if (activateMatch) {
+      activations.push({ participant: activateMatch[1], lineIndex: i, type: 'activate' });
+      continue;
+    }
+
+    const deactivateMatch = trimmed.match(/^deactivate\s+(\w+)$/i);
+    if (deactivateMatch) {
+      activations.push({ participant: deactivateMatch[1], lineIndex: i, type: 'deactivate' });
       continue;
     }
 
@@ -168,5 +188,5 @@ export function parseDiagram(input: string): DiagramData {
     }
   }
 
-  return { title, participants, messages, notes, dividers };
+  return { title, participants, messages, notes, dividers, activations };
 }

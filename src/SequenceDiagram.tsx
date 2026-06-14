@@ -48,7 +48,7 @@ interface RenderItem {
 }
 
 export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
-  const { participants, messages, title, notes, dividers } = data;
+  const { participants, messages, title, notes, dividers, activations } = data;
 
   if (participants.length === 0) {
     return (
@@ -140,6 +140,50 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
   }
   const diagramHeight = cy + PADDING_BOTTOM;
 
+  const activationBoxes: Array<{ participantIdx: number; startY: number; endY: number; stack: number }> = [];
+  const activeState = new Map<string, { startY: number; stack: number }>();
+  let cyAct = PADDING_TOP + vOffset + PARTICIPANT_HEIGHT + 30 + titleHeight;
+  let ri = 0;
+  let ai = 0;
+  const sortedActs = [...activations].sort((a, b) => a.lineIndex - b.lineIndex);
+  while (ri < renderItems.length || ai < sortedActs.length) {
+    const riLine = ri < renderItems.length ? renderItems[ri].lineIndex : Infinity;
+    const actLine = ai < sortedActs.length ? sortedActs[ai].lineIndex : Infinity;
+    if (actLine <= riLine) {
+      const act = sortedActs[ai];
+      if (act.type === 'activate') {
+        const existing = activeState.get(act.participant);
+        if (existing) {
+          existing.stack++;
+        } else {
+          activeState.set(act.participant, { startY: cyAct, stack: 0 });
+        }
+      } else {
+        const state = activeState.get(act.participant);
+        if (state) {
+          const pIdx = participants.findIndex(p => p.name === act.participant);
+          activationBoxes.push({ participantIdx: pIdx, startY: state.startY, endY: cyAct, stack: state.stack });
+          activeState.delete(act.participant);
+        }
+      }
+      ai++;
+    } else {
+      const item = renderItems[ri];
+      if (item.type === 'message') {
+        cyAct += getBoxHeight(messages[item.msgIdx!].label);
+      } else if (item.type === 'note') {
+        cyAct += NOTE_HEIGHT + NOTE_PAD_Y;
+      } else {
+        cyAct += DIVIDER_HEIGHT;
+      }
+      ri++;
+    }
+  }
+  for (const [participant, state] of activeState) {
+    const pIdx = participants.findIndex(p => p.name === participant);
+    activationBoxes.push({ participantIdx: pIdx, startY: state.startY, endY: cyAct, stack: state.stack });
+  }
+
   const renderLabel = (label: string, cx: number, boxY: number) => {
     const lines = getLabelLines(label);
     const totalH = lines.length * LINE_HEIGHT;
@@ -179,6 +223,25 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
           <path d="M 0 0 L 10 5 L 0 10" fill="none" stroke="#555" strokeWidth="1.5" />
         </marker>
       </defs>
+
+      {activationBoxes.map((box, i) => {
+        if (box.participantIdx < 0) return null;
+        const lx = participantX[box.participantIdx];
+        const stackOffset = box.stack * 3;
+        return (
+          <rect
+            key={`act-${i}`}
+            x={lx - 4 + stackOffset}
+            y={box.startY}
+            width={8}
+            height={box.endY - box.startY}
+            rx={2}
+            fill="#e3f2fd"
+            stroke="#90caf9"
+            strokeWidth={1}
+          />
+        );
+      })}
 
       {title && (
         <text

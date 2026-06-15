@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { parseDiagram } from './parser';
 import { SequenceDiagram } from './SequenceDiagram';
+import { useZoomPan } from './hooks/useZoomPan';
 
 const DEFAULT_TEXT = `# Sequence Diagram Editor
 # Syntax:
@@ -121,8 +122,10 @@ function isCursorInsideQuotes(allLines: string[], lineIdx: number, colIdx: numbe
 function App() {
   const [text, setText] = useState(DEFAULT_TEXT);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const diagramData = useMemo(() => parseDiagram(text), [text]);
+  const zoomPan = useZoomPan(previewRef);
 
   const handleSelect = useCallback((type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => {
     const textarea = textareaRef.current;
@@ -249,7 +252,7 @@ function App() {
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.title}>Sequence Diagram Editor</h1>
-        <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right. Click a label or participant in the preview to select its source text.</p>
+        <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right.</p>
       </header>
       <div style={styles.editorContainer}>
         <div style={styles.pane}>
@@ -338,9 +341,24 @@ function App() {
         <div style={styles.pane}>
           <div style={styles.paneHeader}>
             <span style={styles.paneLabel}>Preview</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={() => zoomPan.zoomOut()} style={styles.zoomBtn} title="Zoom out">−</button>
+              <span style={{ fontSize: 12, color: '#888', minWidth: 40, textAlign: 'center' }}>{Math.round(zoomPan.scale * 100)}%</span>
+              <button onClick={() => zoomPan.zoomIn()} style={styles.zoomBtn} title="Zoom in">+</button>
+              <button onClick={zoomPan.reset} style={styles.zoomBtn} title="Fit to view">Fit</button>
+            </div>
           </div>
-          <div style={styles.preview}>
-            <SequenceDiagram data={diagramData} onSelect={handleSelect} />
+          <div
+            ref={previewRef}
+            style={styles.preview}
+            onMouseDown={zoomPan.handlers.handleMouseDown}
+            onMouseMove={zoomPan.handlers.handleMouseMove}
+            onMouseUp={zoomPan.handlers.handleMouseUp}
+            onMouseLeave={zoomPan.handlers.handleMouseUp}
+          >
+            <div style={{ transform: `translate(${zoomPan.offsetX}px, ${zoomPan.offsetY}px) scale(${zoomPan.scale})`, transformOrigin: '0 0' }}>
+              <SequenceDiagram data={diagramData} onSelect={handleSelect} />
+            </div>
           </div>
         </div>
       </div>
@@ -361,6 +379,7 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#fff',
     borderBottom: '1px solid #e0e0e0',
     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    flexShrink: 0,
   },
   title: {
     margin: 0,
@@ -376,6 +395,7 @@ const styles: Record<string, React.CSSProperties> = {
   editorContainer: {
     display: 'flex',
     flex: 1,
+    minHeight: 0,
     overflow: 'hidden',
   },
   pane: {
@@ -389,6 +409,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 16px',
     borderBottom: '1px solid #e8e8e8',
     backgroundColor: '#fafafa',
+    flexShrink: 0,
   },
   paneLabel: {
     fontSize: 12,
@@ -396,6 +417,26 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     letterSpacing: 1,
     color: '#888',
+  },
+  zoomBtn: {
+    padding: '2px 6px',
+    border: '1px solid #ddd',
+    borderRadius: 3,
+    background: '#fff',
+    cursor: 'pointer',
+    fontSize: 12,
+    color: '#666',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  preview: {
+    flex: 1,
+    padding: 16,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    minHeight: 0,
+    position: 'relative',
+    cursor: 'grab',
   },
   textarea: {
     flex: 1,
@@ -409,17 +450,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#333',
     backgroundColor: '#fdfdfd',
     tabSize: 2,
-  },
-  divider: {
-    width: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  preview: {
-    flex: 1,
-    padding: 16,
-    overflow: 'auto',
-    backgroundColor: '#fff',
-    minHeight: 0,
   },
 };
 

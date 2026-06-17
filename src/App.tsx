@@ -141,10 +141,48 @@ function App() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const handleExport = useCallback((format: 'svg' | 'png') => {
+  const handleExport = useCallback(async (format: 'svg' | 'png', action: 'download' | 'copy') => {
     if (!svgRef.current) return;
-    if (format === 'svg') exportSvg(svgRef.current);
-    else exportPng(svgRef.current);
+    if (action === 'copy') {
+      try {
+        const cloned = svgRef.current.cloneNode(true) as SVGSVGElement;
+        if (!cloned.getAttribute('xmlns')) {
+          cloned.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        }
+        const serializer = new XMLSerializer();
+        const svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(cloned);
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = url;
+        });
+        const rect = svgRef.current.getBBox();
+        const w = (rect.width || svgRef.current.clientWidth || 800) + 80;
+        const h = (rect.height || svgRef.current.clientHeight || 600) + 80;
+        const canvas = document.createElement('canvas');
+        canvas.width = w * 2;
+        canvas.height = h * 2;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 40, 40, w, h);
+        URL.revokeObjectURL(url);
+        const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (pngBlob) {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+        }
+      } catch {
+        if (format === 'svg') exportSvg(svgRef.current);
+        else exportPng(svgRef.current);
+      }
+    } else if (format === 'svg') {
+      exportSvg(svgRef.current);
+    } else {
+      exportPng(svgRef.current);
+    }
     setExportOpen(false);
   }, []);
   const [splitRatio, setSplitRatio] = useState(() => {
@@ -312,8 +350,24 @@ function App() {
             </button>
             {exportOpen && (
               <div style={styles.exportDropdown}>
-                <button onClick={() => handleExport('svg')} style={styles.exportOption} className="export-option">SVG</button>
-                <button onClick={() => handleExport('png')} style={styles.exportOption} className="export-option">PNG</button>
+                <div style={styles.exportRow}>
+                  <span style={styles.exportLabel}>SVG</span>
+                  <button onClick={() => handleExport('svg', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download SVG">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </button>
+                  <button onClick={() => handleExport('svg', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy SVG">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+                <div style={styles.exportRow}>
+                  <span style={styles.exportLabel}>PNG</span>
+                  <button onClick={() => handleExport('png', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download PNG">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </button>
+                  <button onClick={() => handleExport('png', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy PNG">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -480,6 +534,32 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
     zIndex: 100,
     overflow: 'hidden',
+    padding: '4px 0',
+  },
+  exportRow: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '4px 12px',
+    gap: 8,
+  },
+  exportLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#333',
+    minWidth: 32,
+  },
+  exportIconBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    border: 'none',
+    borderRadius: 4,
+    background: 'transparent',
+    cursor: 'pointer',
+    color: '#666',
+    padding: 0,
   },
   exportOption: {
     display: 'block',

@@ -15,3 +15,8 @@ html, body, #root {
 .export-option:hover {
   background: #f5f5f5;
 }
+
+.export-icon-btn:hover {
+  background: #f0f0f0;
+  color: #333;
+}

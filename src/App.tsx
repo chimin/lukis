@@ -5,6 +5,7 @@ import { useZoomPan } from './hooks/useZoomPan';
 import { exportPng } from './utils/exportPng';
 import { exportSvg } from './utils/exportSvg';
 import { exportPlantUml } from './utils/exportPlantUml';
+import { exportMermaid } from './utils/exportMermaid';
 
 const DEFAULT_TEXT = `# Sequence Diagram Editor
 # Syntax:
@@ -181,21 +182,23 @@ function App() {
     };
   }, [splitRatio]);
 
-  const handleExport = useCallback(async (format: 'svg' | 'png' | 'puml', action: 'download' | 'copy' | 'preview') => {
-    if (format === 'puml') {
-      const puml = exportPlantUml(diagramData);
+  const handleExport = useCallback(async (format: 'svg' | 'png' | 'puml' | 'mmd', action: 'download' | 'copy' | 'preview') => {
+    if (format === 'puml' || format === 'mmd') {
+      const text = format === 'puml' ? exportPlantUml(diagramData) : exportMermaid(diagramData);
+      const label = format === 'puml' ? 'PlantUML' : 'Mermaid';
       if (action === 'preview') {
-        setPreviewText(puml);
+        setPreviewText(text);
         return;
       }
       if (action === 'copy') {
-        await navigator.clipboard.writeText(puml);
-        showToast('PlantUML copied to clipboard');
+        await navigator.clipboard.writeText(text);
+        showToast(`${label} copied to clipboard`);
       } else {
-        const blob = new Blob([puml], { type: 'text/plain' });
+        const ext = format === 'puml' ? 'puml' : 'mmd';
+        const blob = new Blob([text], { type: 'text/plain' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'diagram.puml';
+        a.download = `diagram.${ext}`;
         a.click();
         URL.revokeObjectURL(a.href);
       }
@@ -414,6 +417,20 @@ function App() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
                     <button onClick={() => handleExport('puml', 'preview')} style={styles.exportIconBtn} className="export-icon-btn" title="Preview PlantUML">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div style={styles.exportRow}>
+                  <span style={styles.exportLabel}>Mermaid</span>
+                  <div style={styles.exportActions}>
+                    <button onClick={() => handleExport('mmd', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download Mermaid">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button onClick={() => handleExport('mmd', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy Mermaid">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                    <button onClick={() => handleExport('mmd', 'preview')} style={styles.exportIconBtn} className="export-icon-btn" title="Preview Mermaid">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     </button>
                   </div>

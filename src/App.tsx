@@ -131,6 +131,14 @@ function App() {
 
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2000);
+  }, []);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -182,6 +190,7 @@ function App() {
       }
       if (action === 'copy') {
         await navigator.clipboard.writeText(puml);
+        showToast('PlantUML copied to clipboard');
       } else {
         const blob = new Blob([puml], { type: 'text/plain' });
         const a = document.createElement('a');
@@ -224,6 +233,7 @@ function App() {
         const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
         if (pngBlob) {
           await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+          showToast('Image copied to clipboard');
         }
       } catch {
         if (format === 'svg') exportSvg(svgRef.current);
@@ -235,7 +245,7 @@ function App() {
       exportPng(svgRef.current);
     }
     setExportOpen(false);
-  }, [diagramData]);
+  }, [diagramData, showToast]);
 
   const handleSelect = useCallback((type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => {
     const textarea = textareaRef.current;
@@ -533,11 +543,14 @@ function App() {
             </div>
             <pre style={styles.previewCode}>{previewText}</pre>
             <div style={styles.previewActions}>
-              <button onClick={() => { navigator.clipboard.writeText(previewText); }} style={styles.previewActionBtn}>Copy</button>
+              <button onClick={() => { navigator.clipboard.writeText(previewText); showToast('PlantUML copied to clipboard'); }} style={styles.previewActionBtn}>Copy</button>
               <button onClick={() => { setPreviewText(null); handleExport('puml', 'download'); }} style={styles.previewActionBtn}>Download</button>
             </div>
           </div>
         </div>
+      )}
+      {toast && (
+        <div style={styles.toast}>{toast}</div>
       )}
     </div>
   );
@@ -765,6 +778,19 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 13,
     color: '#333',
+  },
+  toast: {
+    position: 'fixed',
+    top: 24,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: '#333',
+    color: '#fff',
+    padding: '10px 20px',
+    borderRadius: 6,
+    fontSize: 14,
+    zIndex: 2000,
+    boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
   },
 };
 

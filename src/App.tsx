@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { parseDiagram } from './parser';
 import { SequenceDiagram } from './SequenceDiagram';
 import { useZoomPan } from './hooks/useZoomPan';
@@ -123,6 +123,33 @@ function App() {
   const [text, setText] = useState(DEFAULT_TEXT);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [splitRatio, setSplitRatio] = useState(() => {
+    const saved = localStorage.getItem('pane-split');
+    return saved ? parseFloat(saved) : 0.5;
+  });
+  const isDragging = useRef(false);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      setSplitRatio(Math.max(0.2, Math.min(0.8, ratio)));
+    };
+    const onMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        localStorage.setItem('pane-split', String(splitRatio));
+      }
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [splitRatio]);
 
   const diagramData = useMemo(() => parseDiagram(text), [text]);
   const zoomPan = useZoomPan(previewRef);
@@ -254,7 +281,7 @@ function App() {
         <h1 style={styles.title}>Sequence Diagram Editor</h1>
         <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right.</p>
       </header>
-      <div style={styles.editorContainer}>
+      <div style={{ ...styles.editorContainer, gridTemplateColumns: `${splitRatio}fr auto ${(1 - splitRatio)}fr` }} ref={containerRef}>
         <div style={styles.pane}>
           <div style={styles.paneHeader}>
             <span style={styles.paneLabel}>Editor</span>
@@ -337,7 +364,10 @@ function App() {
             placeholder="Enter sequence diagram syntax..."
           />
         </div>
-        <div style={styles.divider} />
+        <div
+          style={styles.divider}
+          onMouseDown={() => { isDragging.current = true; }}
+        />
         <div style={styles.pane}>
           <div style={styles.paneHeader}>
             <span style={styles.paneLabel}>Preview</span>
@@ -393,13 +423,20 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#666',
   },
   editorContainer: {
-    display: 'flex',
+    display: 'grid',
     flex: 1,
     minHeight: 0,
     overflow: 'hidden',
   },
+  divider: {
+    width: 4,
+    backgroundColor: '#e0e0e0',
+    cursor: 'col-resize',
+    userSelect: 'none',
+  },
   pane: {
     flex: 1,
+    minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',

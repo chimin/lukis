@@ -3,6 +3,7 @@ import { parseDiagram } from './parser';
 import { SequenceDiagram } from './SequenceDiagram';
 import { useZoomPan } from './hooks/useZoomPan';
 import { exportPng } from './utils/exportPng';
+import { exportSvg } from './utils/exportSvg';
 
 const DEFAULT_TEXT = `# Sequence Diagram Editor
 # Syntax:
@@ -127,8 +128,24 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  const handleExportPng = useCallback(() => {
-    if (svgRef.current) exportPng(svgRef.current);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const handleExport = useCallback((format: 'svg' | 'png') => {
+    if (!svgRef.current) return;
+    if (format === 'svg') exportSvg(svgRef.current);
+    else exportPng(svgRef.current);
+    setExportOpen(false);
   }, []);
   const [splitRatio, setSplitRatio] = useState(() => {
     const saved = localStorage.getItem('pane-split');
@@ -289,7 +306,17 @@ function App() {
             <h1 style={styles.title}>Sequence Diagram Editor</h1>
             <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right.</p>
           </div>
-          <button onClick={handleExportPng} style={styles.exportBtn} title="Export as PNG">Export PNG</button>
+          <div style={{ position: 'relative' }} ref={exportRef}>
+            <button onClick={() => setExportOpen((o) => !o)} style={styles.exportBtn} title="Export diagram">
+              Export ▾
+            </button>
+            {exportOpen && (
+              <div style={styles.exportDropdown}>
+                <button onClick={() => handleExport('svg')} style={styles.exportOption} className="export-option">SVG</button>
+                <button onClick={() => handleExport('png')} style={styles.exportOption} className="export-option">PNG</button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
       <div style={{ ...styles.editorContainer, gridTemplateColumns: `${splitRatio}fr auto ${(1 - splitRatio)}fr` }} ref={containerRef}>
@@ -441,6 +468,29 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 13,
     color: '#333',
+  },
+  exportDropdown: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 4,
+    background: '#fff',
+    border: '1px solid #ddd',
+    borderRadius: 4,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    zIndex: 100,
+    overflow: 'hidden',
+  },
+  exportOption: {
+    display: 'block',
+    width: '100%',
+    padding: '8px 16px',
+    border: 'none',
+    background: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: '#333',
+    textAlign: 'left',
   },
   editorContainer: {
     display: 'grid',

@@ -4,6 +4,7 @@ import { SequenceDiagram } from './SequenceDiagram';
 import { useZoomPan } from './hooks/useZoomPan';
 import { exportPng } from './utils/exportPng';
 import { exportSvg } from './utils/exportSvg';
+import { exportPlantUml } from './utils/exportPlantUml';
 
 const DEFAULT_TEXT = `# Sequence Diagram Editor
 # Syntax:
@@ -141,7 +142,57 @@ function App() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const handleExport = useCallback(async (format: 'svg' | 'png', action: 'download' | 'copy') => {
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [splitRatio, setSplitRatio] = useState(() => {
+    const saved = localStorage.getItem('pane-split');
+    return saved ? parseFloat(saved) : 0.5;
+  });
+  const isDragging = useRef(false);
+
+  const diagramData = useMemo(() => parseDiagram(text), [text]);
+  const zoomPan = useZoomPan(previewRef);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      setSplitRatio(Math.max(0.2, Math.min(0.8, ratio)));
+    };
+    const onMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        localStorage.setItem('pane-split', String(splitRatio));
+      }
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [splitRatio]);
+
+  const handleExport = useCallback(async (format: 'svg' | 'png' | 'puml', action: 'download' | 'copy' | 'preview') => {
+    if (format === 'puml') {
+      const puml = exportPlantUml(diagramData);
+      if (action === 'preview') {
+        setPreviewText(puml);
+        return;
+      }
+      if (action === 'copy') {
+        await navigator.clipboard.writeText(puml);
+      } else {
+        const blob = new Blob([puml], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'diagram.puml';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+      setExportOpen(false);
+      return;
+    }
     if (!svgRef.current) return;
     if (action === 'copy') {
       try {
@@ -184,36 +235,7 @@ function App() {
       exportPng(svgRef.current);
     }
     setExportOpen(false);
-  }, []);
-  const [splitRatio, setSplitRatio] = useState(() => {
-    const saved = localStorage.getItem('pane-split');
-    return saved ? parseFloat(saved) : 0.5;
-  });
-  const isDragging = useRef(false);
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const ratio = (e.clientX - rect.left) / rect.width;
-      setSplitRatio(Math.max(0.2, Math.min(0.8, ratio)));
-    };
-    const onMouseUp = () => {
-      if (isDragging.current) {
-        isDragging.current = false;
-        localStorage.setItem('pane-split', String(splitRatio));
-      }
-    };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [splitRatio]);
-
-  const diagramData = useMemo(() => parseDiagram(text), [text]);
-  const zoomPan = useZoomPan(previewRef);
+  }, [diagramData]);
 
   const handleSelect = useCallback((type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => {
     const textarea = textareaRef.current;
@@ -352,21 +374,39 @@ function App() {
               <div style={styles.exportDropdown}>
                 <div style={styles.exportRow}>
                   <span style={styles.exportLabel}>SVG</span>
-                  <button onClick={() => handleExport('svg', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download SVG">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  </button>
-                  <button onClick={() => handleExport('svg', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy SVG">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  </button>
+                  <div style={styles.exportActions}>
+                    <button onClick={() => handleExport('svg', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download SVG">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button onClick={() => handleExport('svg', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy SVG">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <div style={styles.exportRow}>
                   <span style={styles.exportLabel}>PNG</span>
-                  <button onClick={() => handleExport('png', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download PNG">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  </button>
-                  <button onClick={() => handleExport('png', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy PNG">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  </button>
+                  <div style={styles.exportActions}>
+                    <button onClick={() => handleExport('png', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download PNG">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button onClick={() => handleExport('png', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy PNG">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div style={styles.exportRow}>
+                  <span style={styles.exportLabel}>PlantUML</span>
+                  <div style={styles.exportActions}>
+                    <button onClick={() => handleExport('puml', 'download')} style={styles.exportIconBtn} className="export-icon-btn" title="Download PlantUML">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button onClick={() => handleExport('puml', 'copy')} style={styles.exportIconBtn} className="export-icon-btn" title="Copy PlantUML">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                    <button onClick={() => handleExport('puml', 'preview')} style={styles.exportIconBtn} className="export-icon-btn" title="Preview PlantUML">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -484,6 +524,21 @@ function App() {
           </div>
         </div>
       </div>
+      {previewText && (
+        <div style={styles.previewOverlay} onClick={() => setPreviewText(null)}>
+          <div style={styles.previewModal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.previewHeader}>
+              <span style={styles.previewTitle}>PlantUML Preview</span>
+              <button onClick={() => setPreviewText(null)} style={styles.previewClose}>×</button>
+            </div>
+            <pre style={styles.previewCode}>{previewText}</pre>
+            <div style={styles.previewActions}>
+              <button onClick={() => { navigator.clipboard.writeText(previewText); }} style={styles.previewActionBtn}>Copy</button>
+              <button onClick={() => { setPreviewText(null); handleExport('puml', 'download'); }} style={styles.previewActionBtn}>Download</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -540,13 +595,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     padding: '4px 12px',
-    gap: 8,
+    gap: 6,
   },
   exportLabel: {
     fontSize: 13,
     fontWeight: 600,
     color: '#333',
-    minWidth: 32,
+    width: 60,
+    flexShrink: 0,
+  },
+  exportActions: {
+    display: 'flex',
+    gap: 2,
   },
   exportIconBtn: {
     display: 'flex',
@@ -637,6 +697,74 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#333',
     backgroundColor: '#fdfdfd',
     tabSize: 2,
+  },
+  previewOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  previewModal: {
+    background: '#fff',
+    borderRadius: 8,
+    width: '80%',
+    maxWidth: 700,
+    maxHeight: '80vh',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+  },
+  previewHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 16px',
+    borderBottom: '1px solid #e8e8e8',
+  },
+  previewTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#333',
+  },
+  previewClose: {
+    border: 'none',
+    background: 'none',
+    fontSize: 20,
+    cursor: 'pointer',
+    color: '#888',
+    padding: '0 4px',
+    lineHeight: 1,
+  },
+  previewCode: {
+    flex: 1,
+    overflow: 'auto',
+    padding: 16,
+    margin: 0,
+    fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+    fontSize: 13,
+    lineHeight: 1.6,
+    color: '#333',
+    background: '#fafafa',
+    whiteSpace: 'pre',
+  },
+  previewActions: {
+    display: 'flex',
+    gap: 8,
+    padding: '12px 16px',
+    borderTop: '1px solid #e8e8e8',
+    justifyContent: 'flex-end',
+  },
+  previewActionBtn: {
+    padding: '6px 14px',
+    border: '1px solid #ddd',
+    borderRadius: 4,
+    background: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: '#333',
   },
 };
 

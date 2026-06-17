@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { parseDiagram } from './parser';
 import { SequenceDiagram } from './SequenceDiagram';
 import { useZoomPan } from './hooks/useZoomPan';
+import { exportPng } from './utils/exportPng';
 
 const DEFAULT_TEXT = `# Sequence Diagram Editor
 # Syntax:
@@ -124,6 +125,11 @@ function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const handleExportPng = useCallback(() => {
+    if (svgRef.current) exportPng(svgRef.current);
+  }, []);
   const [splitRatio, setSplitRatio] = useState(() => {
     const saved = localStorage.getItem('pane-split');
     return saved ? parseFloat(saved) : 0.5;
@@ -278,8 +284,13 @@ function App() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>Sequence Diagram Editor</h1>
-        <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right.</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1 style={styles.title}>Sequence Diagram Editor</h1>
+            <p style={styles.subtitle}>Write syntax on the left, see the diagram on the right.</p>
+          </div>
+          <button onClick={handleExportPng} style={styles.exportBtn} title="Export as PNG">Export PNG</button>
+        </div>
       </header>
       <div style={{ ...styles.editorContainer, gridTemplateColumns: `${splitRatio}fr auto ${(1 - splitRatio)}fr` }} ref={containerRef}>
         <div style={styles.pane}>
@@ -387,7 +398,7 @@ function App() {
             onMouseLeave={zoomPan.handlers.handleMouseUp}
           >
             <div style={{ transform: `translate(${zoomPan.offsetX}px, ${zoomPan.offsetY}px) scale(${zoomPan.scale})`, transformOrigin: '0 0' }}>
-              <SequenceDiagram data={diagramData} onSelect={handleSelect} />
+              <SequenceDiagram data={diagramData} onSelect={handleSelect} svgRef={svgRef} />
             </div>
           </div>
         </div>
@@ -421,6 +432,15 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '4px 0 0',
     fontSize: 14,
     color: '#666',
+  },
+  exportBtn: {
+    padding: '6px 14px',
+    border: '1px solid #ddd',
+    borderRadius: 4,
+    background: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: '#333',
   },
   editorContainer: {
     display: 'grid',

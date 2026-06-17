@@ -3,6 +3,7 @@ import type { DiagramData } from './parser';
 interface SequenceDiagramProps {
   data: DiagramData;
   onSelect: (type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => void;
+  svgRef?: React.RefObject<SVGSVGElement | null>;
 }
 
 const PARTICIPANT_WIDTH = 140;
@@ -47,7 +48,7 @@ interface RenderItem {
   dividerIdx?: number;
 }
 
-export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
+export function SequenceDiagram({ data, onSelect, svgRef }: SequenceDiagramProps) {
   const { participants, messages, title, notes, dividers, activations } = data;
 
   if (participants.length === 0) {
@@ -210,6 +211,7 @@ export function SequenceDiagram({ data, onSelect }: SequenceDiagramProps) {
 
   return (
     <svg
+      ref={svgRef}
       width="100%"
       height="100%"
       viewBox={`0 0 ${diagramWidth} ${diagramHeight}`}

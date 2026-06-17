@@ -39,6 +39,7 @@ function getBoxHeight(label: string): number {
 const NOTE_WIDTH = 140;
 const NOTE_HEIGHT = 28;
 const NOTE_PAD_Y = 2;
+const MARGIN = 20;
 
 interface RenderItem {
   lineIndex: number;
@@ -99,7 +100,19 @@ export function SequenceDiagram({ data, onSelect, svgRef }: SequenceDiagramProps
     bx += PARTICIPANT_WIDTH + (gaps[i] ?? BASE_GAP);
   }
 
-  const diagramWidth = participantBoxX[participantBoxX.length - 1] + PARTICIPANT_WIDTH + 40;
+  let diagramWidth = participantBoxX[participantBoxX.length - 1] + PARTICIPANT_WIDTH + 40;
+  let minX = 0;
+  for (const note of notes) {
+    const pIdx = getParticipantIdx(note.participant);
+    const pCenterX = pIdx >= 0 ? participantX[pIdx] : diagramWidth / 2;
+    if (note.position === 'left') {
+      minX = Math.min(minX, pCenterX - NOTE_WIDTH - NOTE_PAD_Y);
+    } else if (note.position === 'right') {
+      diagramWidth = Math.max(diagramWidth, pCenterX + NOTE_PAD_Y + NOTE_WIDTH);
+    }
+  }
+  const viewBoxX = minX - MARGIN;
+  const viewBoxWidth = diagramWidth - minX + MARGIN * 2;
 
   const renderItems: RenderItem[] = [];
   let msgIdx = 0;
@@ -214,7 +227,7 @@ export function SequenceDiagram({ data, onSelect, svgRef }: SequenceDiagramProps
       ref={svgRef}
       width="100%"
       height="100%"
-      viewBox={`0 0 ${diagramWidth} ${diagramHeight}`}
+      viewBox={`${viewBoxX} 0 ${viewBoxWidth} ${diagramHeight}`}
       style={{ fontFamily: 'system-ui, sans-serif' }}
     >
       <defs>
@@ -247,7 +260,7 @@ export function SequenceDiagram({ data, onSelect, svgRef }: SequenceDiagramProps
 
       {title && (
         <text
-          x={diagramWidth / 2}
+          x={(minX + diagramWidth) / 2}
           y={PADDING_TOP + 20}
           textAnchor="middle"
           fill="#1a1a2e"
@@ -339,9 +352,9 @@ export function SequenceDiagram({ data, onSelect, svgRef }: SequenceDiagramProps
         const { y: divY } = dividerPositions[i];
         return (
           <g key={`divider-${i}`} onClick={() => onSelect('divider', divider.label)} style={{ cursor: 'pointer' }}>
-            <line x1={40} y1={divY} x2={diagramWidth - 40} y2={divY} stroke="#bbb" strokeWidth={1} strokeDasharray="6 4" />
-            <rect x={diagramWidth / 2 - 40} y={divY - 10} width={80} height={20} rx={4} fill="#f5f5f5" />
-            <text x={diagramWidth / 2} y={divY + 4} textAnchor="middle" fill="#888" fontSize={12}>
+            <line x1={minX} y1={divY} x2={diagramWidth} y2={divY} stroke="#bbb" strokeWidth={1} strokeDasharray="6 4" />
+            <rect x={(minX + diagramWidth) / 2 - 40} y={divY - 10} width={80} height={20} rx={4} fill="#f5f5f5" />
+            <text x={(minX + diagramWidth) / 2} y={divY + 4} textAnchor="middle" fill="#888" fontSize={12}>
               {divider.label}
             </text>
           </g>

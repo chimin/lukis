@@ -1,4 +1,4 @@
-import type { DiagramData } from '../parser';
+import type { DiagramData } from '../types';
 
 export function exportMermaid(data: DiagramData): string {
   const lines: string[] = ['sequenceDiagram'];

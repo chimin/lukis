@@ -1,8 +1,8 @@
-import type { DiagramData } from './parser';
+import type { DiagramData, SelectType } from './types';
 
 interface SequenceDiagramProps {
   data: DiagramData;
-  onSelect: (type: 'participant' | 'message' | 'divider', text: string, lineIndex?: number) => void;
+  onSelect: (type: SelectType, text: string, lineIndex?: number) => void;
   svgRef?: React.RefObject<SVGSVGElement | null>;
 }
 

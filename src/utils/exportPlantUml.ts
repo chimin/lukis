@@ -1,4 +1,4 @@
-import type { DiagramData } from '../parser';
+import type { DiagramData } from '../types';
 
 export function exportPlantUml(data: DiagramData): string {
   const lines: string[] = ['@startuml'];

@@ -1,0 +1,27 @@
+.preview {
+  flex: 1;
+  padding: 16px;
+  overflow: hidden;
+  background: var(--color-surface);
+  min-height: 0;
+  position: relative;
+  cursor: grab;
+}
+
+.preview-inner {
+  transform-origin: 0 0;
+}
+
+.textarea {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background: #fdfdfd;
+  tab-size: 2;
+}
